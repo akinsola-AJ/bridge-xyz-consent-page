@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Consent Page</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <script>
+  (async function() {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const url = params.get('url');
+    const logUrl = params.get('log_url');
+    const signedAgreementId = params.get('signed_agreement_id');
+    const clientErrorLogUrl = 'https://vitalswap.com/test/api_v2/utils/clientError';
+    
+    let errorMsg = `<div>
+          <p>Unable to load your consent page.<br>Please try again.</p>
+        </div>`;
+
+    if (!id) {
+      document.body.innerHTML = errorMsg;
+      return;
+    }
+
+    try {
+      if (logUrl && signedAgreementId) {
+        // Log signed agreement
+        const postResponse = await fetch(logUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, signed_agreement_id: signedAgreementId })
+        });
+
+        if (!postResponse.ok) throw new Error('Failed to log agreement');
+        const data = await postResponse.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          document.body.innerHTML = `<h2>Agreement logged successfully!</h2>`;
+        }
+      } else if (url) {
+        // Fetch redirect URL
+        const getResponse = await fetch(`${url}?id=${encodeURIComponent(id)}`);
+        if (!getResponse.ok) throw new Error('Failed to fetch target URL');
+
+        const data = await getResponse.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          document.body.innerHTML = errorMsg;
+        }
+      } else {
+        document.body.innerHTML = errorMsg;
+      }
+    } catch (error) {
+      console.error(error);
+      document.body.innerHTML = errorMsg;
+
+      try {
+        await fetch(clientErrorLogUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: id || 'unknown',
+            error: error.message || 'Unknown error',
+            context: {
+              url: url || '',
+              logUrl: logUrl || '',
+              signedAgreementId: signedAgreementId || ''
+            }
+          })
+        });
+      } catch (logError) {
+        console.error('Failed to report client error', logError);
+        // Do nothing else, don't block anything
+      }
+    }
+  })();
+</script>
+</body>
+</html>
