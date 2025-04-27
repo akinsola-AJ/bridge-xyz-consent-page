@@ -1,0 +1,1 @@
+# bridge-xyz-consent-page
